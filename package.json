@@ -1,11 +1,12 @@
 {
-  "name": "react-audio-spectrum",
-  "version": "0.1.0",
+  "name": "react-audio-spectrum2",
+  "version": "0.1.1",
   "description": "a component for displaying audio spectrum",
   "main": "./lib/AudioSpectrum.js",
+  "types": "./lib/AudioSpectrum.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/hu-ke/react-audio-spectrum.git"
+    "url": "https://github.com/nikakoy131/react-audio-spectrum.git"
   },
   "keywords": [
     "audio",
@@ -18,13 +19,22 @@
     "音频"
   ],
   "dependencies": {
-    "prop-types": "^15.6.0",
-    "react": "^16.1.0",
-    "react-dom": "^16.1.0"
+    "@types/react": "^16.9.38",
+    "prop-types": "^15.7.2",
+    "react": "^16.13.1",
+    "react-dom": "^16.13.1"
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
   },
   "author": "huke <403392669@qq.com>",
-  "license": "ISC"
+  "contributors": [
+    "nikakoy131 <nikakoy131@gmail.com>"
+  ],
+  "license": "ISC",
+  "devDependencies": {
+    "typescript": "^3.9.5"
+  }
 }

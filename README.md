@@ -1,6 +1,8 @@
 # React Audio Spectrum
 > An audio spectrum visualizer for react.
 
+Fork rewrited to typescript
+
 ![](https://hu-ke.github.io/react-audio-spectrum/react-audio-spectrum-demo.gif)
 ## Live Demo
 > https://hu-ke.github.io/react-audio-spectrum/
