@@ -1,6 +1,6 @@
 {
   "name": "react-audio-spectrum2",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "a component for displaying audio spectrum",
   "main": "./lib/AudioSpectrum.js",
   "types": "./lib/AudioSpectrum.d.ts",
