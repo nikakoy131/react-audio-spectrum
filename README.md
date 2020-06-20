@@ -57,9 +57,9 @@ if you use both `audioId` and `audioEle` props, the component will ignore `audio
 |gap|gap between meters|number|10|false|
 ## Install
 ```
-yarn add react-audio-spectrum --save
+yarn add react-audio-spectrum2 --save
 or
-npm install react-audio-spectrum --save
+npm install react-audio-spectrum2 --save
 ```
 ## Contributing
-react-audio-spectrum is a free and open source react library, and I appreciate any help you're willing to give - whether it's fixing bugs, improving documentation, or suggesting new features.
+react-audio-spectrum2 is a free and open source react library, and I appreciate any help you're willing to give - whether it's fixing bugs, improving documentation, or suggesting new features.

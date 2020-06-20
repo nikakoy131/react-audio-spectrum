@@ -1,196 +1,220 @@
-import React, { Component, CSSProperties } from 'react'
-import PropTypes from 'prop-types'
+import React, {
+  CSSProperties, useRef, useEffect,
+} from 'react';
 
 type MeterColor = {
-    stop: number,
-    color: CSSProperties['color'],
+  stop: number,
+  color: CSSProperties['color'],
 };
 
 export type AudioSpectrumProps = {
-    id: string,
-    width: number,
-    height: number,
-    audioId: string,
-    audioEle: HTMLAudioElement,
-    capColor?: CSSProperties['color'],
-    capHeight: number,
-    meterWidth: number,
-    meterCount: number,
-    meterColor: string | MeterColor[],
-    gap: number,
+  id: string,
+  width: number,
+  height: number,
+  audioId?: string,
+  audioEle?: HTMLAudioElement,
+  capColor: CSSProperties['color'],
+  capHeight: number,
+  meterWidth: number,
+  meterCount: number,
+  meterColor: string | MeterColor[],
+  gap: number,
 };
 
 type PlayStatus = 'PAUSED' | 'PLAYING';
 
 const defaultProps = {
-    width: 300,
-    height: 200,
-    capColor: '#FFF',
-    capHeight: 2,
-    meterWidth: 2,
-    meterCount: 40 * (2 + 2),
-    meterColor: [
-        {stop: 0, color: '#f00'},
-        {stop: 0.5, color: '#0CD7FD'},
-        {stop: 1, color: 'red'}
-    ],
-    gap: 10, // gap between meters
+  width: 300,
+  height: 200,
+  capColor: '#FFF',
+  capHeight: 2,
+  meterWidth: 2,
+  meterCount: 40 * (2 + 2),
+  meterColor: [
+    { stop: 0, color: '#f00' },
+    { stop: 0.5, color: '#0CD7FD' },
+    { stop: 1, color: 'red' },
+  ],
+  gap: 10, // gap between meters
+};
+
+function getRandomId(len: number) {
+  const str = '1234567890-qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM';
+
+  return Array.from({ length: len })
+    .reduce((acc: string) => acc.concat(
+      str[Math.floor((Math.random() * str.length))],
+    ), '');
 }
 
-class AudioSpectrum extends Component<AudioSpectrumProps> {
-    static defaultProps = defaultProps;
+export default function AudioSpectrum({
+  width = defaultProps.width,
+  height = defaultProps.height,
+  capColor = defaultProps.capColor,
+  capHeight = defaultProps.capHeight,
+  meterWidth = defaultProps.meterWidth,
+  meterCount = defaultProps.meterCount,
+  meterColor = defaultProps.meterColor,
+  gap = defaultProps.gap,
+  id = getRandomId(50),
+  audioEle: propsAudioEl,
+  audioId,
+  ...restProps
+}: AudioSpectrumProps) {
+  let animationId: number;
+  let audioContext: AudioContext;
+  let audioCanvas: HTMLCanvasElement;
+  let playStatus: PlayStatus;
+  const canvasId = id;
+  let mediaEleSource: MediaElementAudioSourceNode;
+  let analyser: AnalyserNode;
+  let audioEle: HTMLAudioElement;
+  const canvasRef = useRef<HTMLCanvasElement>(null);
 
-    private animationId?: number;
-    private audioContext?: AudioContext;
-    private audioEle?: HTMLAudioElement;
-    private audioCanvas?: HTMLCanvasElement;
-    private playStatus?: PlayStatus;
-    canvasId = this.props.id || this.getRandomId(50)
-    private mediaEleSource?: MediaElementAudioSourceNode;
-    private analyser?: AnalyserNode ;
-    canvasRef = React.createRef<HTMLCanvasElement>();
-
-    getRandomId(len:number) {
-        let str = '1234567890-qwertyuiopasdfghjklzxcvbnmQWERTYUIOPASDFGHJKLZXCVBNM'
-        let strLen = str.length
-        let res = ''
-        for (let i = 0; i < len; i++) {
-            let randomIndex = Math.floor((Math.random() * strLen))
-            res += str[randomIndex]
-        }
-        return res
+  const prepareElements = () => {
+    if (!audioId && !propsAudioEl) {
+      console.error('target audio not found!');
+      return;
     }
-    componentDidMount() {
-        this.prepareElements()
-        this.initAudioEvents()
+    if (audioId) {
+      audioEle = document.getElementById(audioId) as HTMLAudioElement;
+    } else if (propsAudioEl) {
+      audioEle = propsAudioEl;
     }
-    initAudioEvents = () => {
-        let audioEle = this.audioEle
-        if (audioEle) {
-            audioEle.onpause = (e) => {
-                this.playStatus = 'PAUSED'
-            }
-            audioEle.onplay = (e) => {
-                this.playStatus = 'PLAYING'
-                this.prepareAPIs()
-                let analyser = this.setupAudioNode(this.audioEle)
-                this.drawSpectrum(analyser)
-            }
-        }
+    audioCanvas = canvasRef.current!;
+  };
+
+  const drawSpectrum = (currentAnalyser: AnalyserNode) => {
+    const cWidth = audioCanvas!.width;
+    const cHeight = audioCanvas!.height - capHeight;
+    // store the vertical position of hte caps for the previous frame
+    const capYPositionArray: number[] = [];
+    const ctx = audioCanvas!.getContext('2d')!;
+    const gradient = ctx.createLinearGradient(0, 0, 0, 300);
+
+    if (Array.isArray(meterColor)) {
+      const stops = meterColor;
+      stops.forEach((stop) => {
+        gradient.addColorStop(stop.stop, stop.color as string);
+      });
+    } else if (typeof meterColor === 'string') {
+      // gradient = this.props.meterColor
     }
-    drawSpectrum = (analyser: AnalyserNode) => {
-        let cwidth = this.audioCanvas!.width
-        let cheight = this.audioCanvas!.height - this.props.capHeight
-        let capYPositionArray: number[] = [] // store the vertical position of hte caps for the preivous frame
-        let ctx = this.audioCanvas!.getContext('2d')!;
-        let gradient = ctx.createLinearGradient(0, 0, 0, 300);
 
-        if (this.props.meterColor.constructor === Array) {
-            let stops = this.props.meterColor
-            let len = stops.length
-            for (let i = 0; i < len; i++) {
-                gradient.addColorStop(stops[i]['stop'], stops[i]['color'] as string)
-            }
-            } else if (typeof this.props.meterColor === 'string') {
-                // gradient = this.props.meterColor 
-            }
-
-            let drawMeter = () => {
-            let array = new Uint8Array(analyser.frequencyBinCount); // item value of array: 0 - 255
-            analyser.getByteFrequencyData(array);
-            if (this.playStatus === 'PAUSED') {
-                for (let i = array.length - 1; i >= 0; i--) {
-                    array[i] = 0
-                }
-                let allCapsReachBottom = !capYPositionArray.some(cap => cap > 0)
-                if (allCapsReachBottom) {
-                    ctx.clearRect(0, 0, cwidth, cheight + this.props.capHeight)
-                    cancelAnimationFrame(this.animationId!) // since the sound is top and animation finished, stop the requestAnimation to prevent potential memory leak,THIS IS VERY IMPORTANT!
-                    return
-                }
-            }
-            let step = Math.round(array.length / this.props.meterCount) // sample limited data from the total array
-            ctx.clearRect(0, 0, cwidth, cheight + this.props.capHeight)
-            for (let i = 0; i < this.props.meterCount; i++) {
-                let value = array[i * step]
-                if (capYPositionArray.length < Math.round(this.props.meterCount)) {
-                    capYPositionArray.push(value)
-                };
-                ctx.fillStyle = this.props.capColor!
-                // draw the cap, with transition effect
-                if (value < capYPositionArray[i]) {
-                    // let y = cheight - (--capYPositionArray[i])
-                    let preValue = --capYPositionArray[i]
-                    let y = (270 - preValue) * cheight / 270
-                    ctx.fillRect(i * (this.props.meterWidth + this.props.gap), y, this.props.meterWidth, this.props.capHeight)
-                } else {
-                    // let y = cheight - value
-                    let y = (270 - value) * cheight / 270
-                    ctx.fillRect(i * (this.props.meterWidth + this.props.gap), y, this.props.meterWidth, this.props.capHeight)
-                    capYPositionArray[i] = value
-                };
-                ctx.fillStyle = gradient; // set the filllStyle to gradient for a better look
-
-                // let y = cheight - value + this.props.capHeight
-                let y = (270 - value) * (cheight) / 270 + this.props.capHeight
-                ctx.fillRect(i * (this.props.meterWidth + this.props.gap), y, this.props.meterWidth, cheight) // the meter
-            }
-            this.animationId = requestAnimationFrame(drawMeter)
+    const drawMeter = () => {
+      // item value of array: 0 - 255
+      const array = new Uint8Array(currentAnalyser.frequencyBinCount);
+      currentAnalyser.getByteFrequencyData(array);
+      if (playStatus === 'PAUSED') {
+        // for (let i = array.length - 1; i >= 0; i--) {
+        //   array[i] = 0;
+        // }
+        array.fill(0);
+        const allCapsReachBottom = !capYPositionArray.some((cap) => cap > 0);
+        if (allCapsReachBottom) {
+          ctx.clearRect(0, 0, cWidth, cHeight + capHeight);
+          // since the sound is top and animation finished,
+          // stop the requestAnimation to prevent potential memory leak,THIS IS VERY IMPORTANT!
+          cancelAnimationFrame(animationId);
+          return;
         }
-        this.animationId = requestAnimationFrame(drawMeter)
-    }
-    setupAudioNode = (audioEle?: HTMLAudioElement) => {
-        if (!audioEle) {
-            throw new Error('Audio element is not found')
-            
+      }
+      // sample limited data from the total array
+      const step = Math.round(array.length / meterCount);
+      ctx.clearRect(0, 0, cWidth, cHeight + capHeight);
+      // eslint-disable-next-line no-plusplus
+      for (let i = 0; i < meterCount; i++) {
+        const value = array[i * step];
+        if (capYPositionArray.length < Math.round(meterCount)) {
+          capYPositionArray.push(value);
         }
-        if (!this.analyser) {
-            this.analyser = this.audioContext!.createAnalyser()
-            this.analyser.smoothingTimeConstant = 0.8
-            this.analyser.fftSize = 2048
-        }
-        
-        if (!this.mediaEleSource) {
-            this.mediaEleSource = this.audioContext!.createMediaElementSource(audioEle)
-            this.mediaEleSource.connect(this.analyser)
-            this.mediaEleSource.connect(this.audioContext!.destination);
-        }
-
-        return this.analyser
-    }
-    prepareElements = () => {
-        let { audioId, audioEle } = this.props
-        if (!audioId && !audioEle) {
-            console.log('target audio not found!');
-            return
-        } else if (audioId) {
-            this.audioEle = document.getElementById(audioId) as HTMLAudioElement;
+        ctx.fillStyle = capColor;
+        // draw the cap, with transition effect
+        if (value < capYPositionArray[i]) {
+          // let y = cHeight - (--capYPositionArray[i])
+          // eslint-disable-next-line no-plusplus
+          const preValue = --capYPositionArray[i];
+          const y = ((270 - preValue) * cHeight) / 270;
+          ctx.fillRect(i * (meterWidth + gap), y, meterWidth, capHeight);
         } else {
-            this.audioEle = audioEle
+          // let y = cHeight - value
+          const y = ((270 - value) * cHeight) / 270;
+          ctx.fillRect(i * (meterWidth + gap), y, meterWidth, capHeight);
+          capYPositionArray[i] = value;
         }
-        
-        this.audioCanvas = this.canvasRef.current!;
-    }
-    prepareAPIs = () => {
-        // fix browser vender for AudioContext and requestAnimationFrame
-        window.AudioContext = window.AudioContext;
-        // window.AudioContext = window.AudioContext || window.webkitAudioContext || window.mozAudioContext || window.msAudioContext;
-        window.requestAnimationFrame = window.requestAnimationFrame;
-        // window.requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame || window.mozRequestAnimationFrame || window.msRequestAnimationFrame;
-        window.cancelAnimationFrame = window.cancelAnimationFrame;
-        // window.cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame || window.msCancelAnimationFrame;
-        try {
-            this.audioContext = new window.AudioContext(); // 1.set audioContext
-        } catch (e) {
-            // console.error('!Your browser does not support AudioContext')
-            console.log(e);
-        }
-    }
-    render() {
-        return (
-            <canvas ref={this.canvasRef} id={this.canvasId} width={this.props.width} height={this.props.height}></canvas>
-        )
-    }
-}
+        ctx.fillStyle = gradient; // set the fillStyle to gradient for a better look
 
-export default AudioSpectrum
+        // let y = cHeight - value + this.props.capHeight
+        const y = ((270 - value) * cHeight) / 270 + capHeight;
+        ctx.fillRect(i * (meterWidth + gap), y, meterWidth, cHeight); // the meter
+      }
+      animationId = requestAnimationFrame(drawMeter);
+    };
+    animationId = requestAnimationFrame(drawMeter);
+  };
+
+  const setupAudioNode = (currentAudioEle?: HTMLAudioElement) => {
+    if (!currentAudioEle) {
+      throw new Error('Audio element is not found');
+    }
+    if (!analyser) {
+      analyser = audioContext.createAnalyser();
+      analyser.smoothingTimeConstant = 0.8;
+      analyser.fftSize = 2048;
+    }
+
+    if (!mediaEleSource) {
+      mediaEleSource = audioContext!.createMediaElementSource(currentAudioEle);
+      mediaEleSource.connect(analyser);
+      mediaEleSource.connect(audioContext!.destination);
+    }
+
+    return analyser;
+  };
+
+  const prepareAPIs = () => {
+    // fix browser vender for AudioContext and requestAnimationFrame
+    // window.AudioContext = window.AudioContext;
+    // window.AudioContext = window.AudioContext || window.webkitAudioContext
+    // || window.mozAudioContext || window.msAudioContext;
+    // window.requestAnimationFrame = window.requestAnimationFrame;
+    // window.requestAnimationFrame = window.requestAnimationFrame || window.webkitRequestAnimationFrame
+    // || window.mozRequestAnimationFrame || window.msRequestAnimationFrame;
+    // window.cancelAnimationFrame = window.cancelAnimationFrame;
+    // window.cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame || window.msCancelAnimationFrame;
+    try {
+      audioContext = new window.AudioContext(); // 1.set audioContext
+    } catch (e) {
+      console.error('!Your browser does not support AudioContext');
+      console.error(e);
+    }
+  };
+  const initAudioEvents = () => {
+    if (audioEle) {
+      audioEle.onpause = () => {
+        playStatus = 'PAUSED';
+      };
+      audioEle.onplay = () => {
+        playStatus = 'PLAYING';
+        prepareAPIs();
+        const currentAnalyser = setupAudioNode(audioEle);
+        drawSpectrum(currentAnalyser);
+      };
+    }
+  };
+
+  useEffect(() => {
+    prepareElements();
+    initAudioEvents();
+  }, []);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      id={canvasId}
+      width={width}
+      height={height}
+      {...restProps}
+    />
+  );
+}
