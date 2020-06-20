@@ -3,3 +3,9 @@ node_modules
 .vscode
 docs
 example
+package-lock.json
+.editorconfig
+.eslintrc.js
+.eslintignore
+.gitignore
+tsconfig.json
