@@ -1,5 +1,5 @@
 import React, {
-  CSSProperties, useRef, useEffect,
+  CSSProperties, useRef, useEffect, HTMLProps,
 } from 'react';
 
 type MeterColor = {
@@ -19,7 +19,7 @@ export type AudioSpectrumProps = {
   meterCount: number,
   meterColor: string | MeterColor[],
   gap: number,
-};
+} & HTMLProps<HTMLCanvasElement>;
 
 type PlayStatus = 'PAUSED' | 'PLAYING';
 
