@@ -1,6 +1,6 @@
 {
   "name": "react-audio-spectrum2",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "description": "a component for displaying audio spectrum",
   "main": "./lib/AudioSpectrum.js",
   "types": "./lib/AudioSpectrum.d.ts",
@@ -42,7 +42,8 @@
     "eslint-plugin-import": "^2.21.2",
     "eslint-plugin-jsx-a11y": "^6.3.1",
     "eslint-plugin-react": "^7.20.0",
-    "eslint-plugin-react-hooks": "^2.5.1",
+    "eslint-plugin-react-hooks": "^4.0.4",
     "typescript": "^3.9.5"
-  }
+  },
+  "dependencies": {}
 }

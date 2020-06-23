@@ -1,5 +1,5 @@
 import React, {
-  CSSProperties, useRef, useEffect, HTMLProps,
+  CSSProperties, useRef, useEffect, HTMLProps, useCallback,
 } from 'react';
 
 type MeterColor = {
@@ -61,35 +61,35 @@ export default function AudioSpectrum({
   audioId,
   ...restProps
 }: AudioSpectrumProps) {
-  let animationId: number;
-  let audioContext: AudioContext;
-  let audioCanvas: HTMLCanvasElement;
-  let playStatus: PlayStatus;
+  const animationId = useRef<number | null>(null);
   const canvasId = id;
-  let mediaEleSource: MediaElementAudioSourceNode;
-  let analyser: AnalyserNode;
-  let audioEle: HTMLAudioElement;
+  const audioContext = useRef<AudioContext | null>(null);
+  const audioCanvas = useRef<HTMLCanvasElement | null>(null);
+  const playStatus = useRef<PlayStatus | null>(null);
+  const mediaEleSource = useRef<MediaElementAudioSourceNode | null>(null);
+  const analyser = useRef<AnalyserNode | null>(null);
+  const audioEle = useRef<HTMLAudioElement | null>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const prepareElements = () => {
+  const prepareElements = useCallback(() => {
     if (!audioId && !propsAudioEl) {
       console.error('target audio not found!');
       return;
     }
     if (audioId) {
-      audioEle = document.getElementById(audioId) as HTMLAudioElement;
+      audioEle.current = document.getElementById(audioId) as HTMLAudioElement;
     } else if (propsAudioEl) {
-      audioEle = propsAudioEl;
+      audioEle.current = propsAudioEl;
     }
-    audioCanvas = canvasRef.current!;
-  };
+    audioCanvas.current = canvasRef.current;
+  }, [audioId, propsAudioEl]);
 
-  const drawSpectrum = (currentAnalyser: AnalyserNode) => {
-    const cWidth = audioCanvas!.width;
-    const cHeight = audioCanvas!.height - capHeight;
+  const drawSpectrum = useCallback((currentAnalyser: AnalyserNode) => {
+    const cWidth = audioCanvas.current!.width;
+    const cHeight = audioCanvas.current!.height - capHeight;
     // store the vertical position of hte caps for the previous frame
     const capYPositionArray: number[] = [];
-    const ctx = audioCanvas!.getContext('2d')!;
+    const ctx = audioCanvas.current!.getContext('2d')!;
     const gradient = ctx.createLinearGradient(0, 0, 0, 300);
 
     if (Array.isArray(meterColor)) {
@@ -105,7 +105,7 @@ export default function AudioSpectrum({
       // item value of array: 0 - 255
       const array = new Uint8Array(currentAnalyser.frequencyBinCount);
       currentAnalyser.getByteFrequencyData(array);
-      if (playStatus === 'PAUSED') {
+      if (playStatus.current === 'PAUSED') {
         // for (let i = array.length - 1; i >= 0; i--) {
         //   array[i] = 0;
         // }
@@ -115,7 +115,7 @@ export default function AudioSpectrum({
           ctx.clearRect(0, 0, cWidth, cHeight + capHeight);
           // since the sound is top and animation finished,
           // stop the requestAnimation to prevent potential memory leak,THIS IS VERY IMPORTANT!
-          cancelAnimationFrame(animationId);
+          cancelAnimationFrame(animationId.current!);
           return;
         }
       }
@@ -148,31 +148,33 @@ export default function AudioSpectrum({
         const y = ((270 - value) * cHeight) / 270 + capHeight;
         ctx.fillRect(i * (meterWidth + gap), y, meterWidth, cHeight); // the meter
       }
-      animationId = requestAnimationFrame(drawMeter);
+      animationId.current = requestAnimationFrame(drawMeter);
     };
-    animationId = requestAnimationFrame(drawMeter);
-  };
+    animationId.current = requestAnimationFrame(drawMeter);
+  }, [capColor, capHeight, gap, meterColor, meterCount, meterWidth]);
 
-  const setupAudioNode = (currentAudioEle?: HTMLAudioElement) => {
+  // create analyser and connect media source
+  const setupAudioNode = useCallback((currentAudioEle: HTMLAudioElement) => {
     if (!currentAudioEle) {
       throw new Error('Audio element is not found');
     }
-    if (!analyser) {
-      analyser = audioContext.createAnalyser();
-      analyser.smoothingTimeConstant = 0.8;
-      analyser.fftSize = 2048;
+    if (!analyser.current && audioContext.current) {
+      analyser.current = audioContext.current.createAnalyser();
+      analyser.current.smoothingTimeConstant = 0.8;
+      analyser.current.fftSize = 2048;
     }
 
-    if (!mediaEleSource) {
-      mediaEleSource = audioContext!.createMediaElementSource(currentAudioEle);
-      mediaEleSource.connect(analyser);
-      mediaEleSource.connect(audioContext!.destination);
+    if (!mediaEleSource.current && audioContext.current && analyser.current) {
+      mediaEleSource.current = audioContext.current.createMediaElementSource(currentAudioEle);
+      mediaEleSource.current.connect(analyser.current);
+      mediaEleSource.current.connect(audioContext.current.destination);
     }
 
     return analyser;
-  };
+  }, []);
 
-  const prepareAPIs = () => {
+  // create or update audioContext
+  const prepareAPIs = useCallback(() => {
     // fix browser vender for AudioContext and requestAnimationFrame
     // window.AudioContext = window.AudioContext;
     // window.AudioContext = window.AudioContext || window.webkitAudioContext
@@ -183,30 +185,30 @@ export default function AudioSpectrum({
     // window.cancelAnimationFrame = window.cancelAnimationFrame;
     // window.cancelAnimationFrame = window.cancelAnimationFrame || window.webkitCancelAnimationFrame || window.mozCancelAnimationFrame || window.msCancelAnimationFrame;
     try {
-      audioContext = new window.AudioContext(); // 1.set audioContext
+      audioContext.current = new window.AudioContext(); // 1.set audioContext
     } catch (e) {
       console.error('!Your browser does not support AudioContext');
       console.error(e);
     }
-  };
-  const initAudioEvents = () => {
-    if (audioEle) {
-      audioEle.onpause = () => {
-        playStatus = 'PAUSED';
+  }, []);
+  const initAudioEvents = useCallback(() => {
+    if (audioEle.current) {
+      audioEle.current.onpause = () => {
+        playStatus.current = 'PAUSED';
       };
-      audioEle.onplay = () => {
-        playStatus = 'PLAYING';
+      audioEle.current.onplay = () => {
+        playStatus.current = 'PLAYING';
         prepareAPIs();
-        const currentAnalyser = setupAudioNode(audioEle);
-        drawSpectrum(currentAnalyser);
+        const currentAnalyser = setupAudioNode(audioEle.current!);
+        drawSpectrum(currentAnalyser.current!);
       };
     }
-  };
+  }, [drawSpectrum, prepareAPIs, setupAudioNode]);
 
   useEffect(() => {
     prepareElements();
     initAudioEvents();
-  }, []);
+  }, [prepareElements, initAudioEvents]);
 
   return (
     <canvas
