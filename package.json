@@ -1,6 +1,6 @@
 {
   "name": "react-audio-spectrum2",
-  "version": "0.1.7",
+  "version": "0.1.8",
   "description": "a component for displaying audio spectrum",
   "main": "./lib/AudioSpectrum.js",
   "types": "./lib/AudioSpectrum.d.ts",
@@ -20,8 +20,8 @@
   ],
   "peerDependencies": {
     "prop-types": "^15.7.2",
-    "react": "^16.13.1",
-    "react-dom": "^16.13.1"
+    "react": "^16.13.1 || ^17.0.0",
+    "react-dom": "^16.13.1 || ^17.0.0"
   },
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
